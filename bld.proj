@@ -11,3 +11,8 @@ test tests =
 	lib adb
 ;;
 
+# Interactive use
+bin demo =
+	demo.myr
+	lib adb
+;;

@@ -6,8 +6,7 @@ use std
 use bio
 
 pkg adb =
-	const open	: (path	: byte[:]	-> std.result(bio.file#,	byte[:]))
-	const parse	: (f	: bio.file#	-> std.result(db,			byte[:]))
+	const ingest	: (f : byte[:]	-> std.result(db,			byte[:]))
 
 	/* Types */
 
@@ -29,7 +28,7 @@ pkg adb =
 
 	// A parsed attrdb database
 	type db = struct
-		records	: record[:]
+		records : record[:]
 	;;
 
 	// The results from a query
@@ -48,27 +47,34 @@ pkg adb =
 	???
 */
 
-// Open and parse a db file
-const open = {path : byte[:]
+
+// Open and parse a file
+const ingest = {path : byte[:]
+	var f, db
+
 	match bio.open(path, bio.Rd)
-	| `std.Ok	f:
-		-> `std.Ok f
+	| `std.Ok	file:
+		f = file
 
 	| `std.Err	e:
 		-> `std.Err e
 	;;
-}
-
-// Parse a file
-const parse = {f : bio.file#
-	var db
 
 	// States for parsing state machine
 	type states = union
-	`Record
-	`SingQuot
-	`DblQuot
+	`SingleQuote
+	`DoubleQuote
+	`Comment
+	`Newline
+	`Key
+	`Value
 	;;
+
+	// Current state
+	var state	= `Newline
+
+	// Last state
+	var last	= state
 
 	// Current line for errors - tick by passing \n
 	var line	= 1
@@ -76,13 +82,118 @@ const parse = {f : bio.file#
 	// Current character for errors - tick each iteration
 	var cn		= 0
 
+	// String builder buffer
+	var buf		= std.mksb()	// Memory leak?
+
 	// Parse into db
 	for c : bio.bychar(f)
-		c++
+		last = state
 
-		;
+		cn++
 
+		if c == '\n'
+			line++
+			cn = 0
+		;;
+
+		std.put("→ {}				({})\n", c, state)
+
+		match state
+		| `Comment:
+			if c == '\n'
+				state = `Newline
+			;;
+
+			continue
+		| _:
+			;
+		;;
+
+		match c
+		| '#':
+			// Allow comments at the beginning of lines and after values
+			match last
+			| `Newline:
+				;
+			| `Value:
+				;
+			| _:
+				-> `std.Err std.fmt("invalid comment beginning at {}:{}:{}", path, line, cn)
+			;;
+
+			state = `Comment
+
+		| '\n':
+			// TODO - commit last value, if any to pair
+			var str = std.sbfin(buf)
+			std.put("» finished value: {}\n", str)
+
+			state = `Newline
+		| '\'':
+			state = `SingleQuote
+		| '\"':
+			state = `DoubleQuote
+		| ' ':
+
+			match last
+			| `Newline:
+				state = `Key
+				buf = std.mksb()
+
+			| `Value:
+				// TODO - commit value to pair
+				var str = std.sbfin(buf)
+				std.put("» finished value: {}\n", str)
+
+				state = `Key
+				buf = std.mksb()
+				;
+			| _:
+				-> `std.Err std.fmt("invalid space at {}:{}:{}", path, line, cn)
+			;;
+
+		| '\t':
+			state = `Key
+			buf = std.mksb()
+
+			match last
+			| `Newline:
+				;
+			| _:
+				-> `std.Err std.fmt("invalid tab at {}:{}:{}", path, line, cn)
+			;;
+
+		| '=':
+			// TODO - commit key to pair
+			var str = std.sbfin(buf)
+			std.put("» finished key: {}\n", str)
+
+			state = `Value
+			buf = std.mksb()
+		| _:
+			// A key or value text segment
+			match state
+			| `Key:
+				std.sbputc(buf, c)
+
+			| `Value:
+				std.sbputc(buf, c)
+
+			| _:
+				match last
+				| `Newline:
+					state = `Key
+					buf = std.mksb()
+					std.sbputc(buf, c)
+
+				| _:
+					-> `std.Err std.fmt("invalid character at {}:{}:{}", path, line, cn)
+				;;
+			;;
+		;;
 	;;
+
+	std.put("{} lines and {} runes\n", line-1, cn)
 
 	-> `std.Ok db
 }

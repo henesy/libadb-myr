@@ -7,6 +7,6 @@ const main = {
 		std.put("parsed.\n")
 
 	| `std.Err	e:
-		std.fatal("err: could not parse file: {}\n", e)
+		std.fatal("err: could not parse file - {}\n", e)
 	;;
 }
