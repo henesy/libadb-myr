@@ -1,0 +1,13 @@
+## Process and query ndb(6) files
+
+# Library
+lib ndb =
+	ndb.myr
+;;
+
+# Tests
+test tests =
+	test.myr
+	lib ndb
+;;
+

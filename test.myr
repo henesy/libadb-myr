@@ -1,0 +1,22 @@
+use std
+use ndb
+
+const main = {
+	match ndb.open("./test.ndb")
+	| `std.Ok	f:
+		std.put("opened.\n")
+
+		ndb.tabwidth = 4
+
+		match ndb.parse(f)
+		| `std.Ok	db:
+			std.put("parsed.\n")
+
+		| `std.Err	e:
+			std.fatal("err: could not parse file: {}\n", e)
+		;;
+
+	| `std.Err	e:
+		std.fatal("err: could not open ndb file: {}\n", e)
+	;;
+}

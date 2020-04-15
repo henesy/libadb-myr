@@ -1,0 +1,49 @@
+/*
+	Process ndb(6) files
+*/
+
+use std
+use bio
+
+pkg ndb =
+	const open	: (path : byte[:] -> std.result(bio.file#, byte[:]))
+	const parse	: (f : bio.file# -> std.result(ndb.db, byte[:]))
+
+	/* Types */
+
+	// A parsed ndb database
+	type db = struct
+
+	;;
+
+	// The results from a query
+	type query = union
+		`Some
+		`None
+	;;
+
+	/* State (bad) */
+
+	// The space-count equivalent to a tab character
+	var tabwidth = 4
+;;
+
+
+// Open and parse an ndb file
+const open = {path : byte[:]
+	match bio.open(path, bio.Rd)
+	| `std.Ok	f:
+		-> `std.Ok f
+
+	| `std.Err	e:
+		-> `std.Err e
+	;;
+}
+
+// Parse a file
+const parse = {f : bio.file#
+
+
+	-> `std.Err "weh"
+}
+
