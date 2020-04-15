@@ -1,0 +1,66 @@
+/*
+	Process attrdb(6) files
+*/
+
+use std
+use bio
+
+pkg adb =
+	const open	: (path	: byte[:]	-> std.result(bio.file#,	byte[:]))
+	const parse	: (f	: bio.file#	-> std.result(db,			byte[:]))
+
+	/* Types */
+
+	// An attribute=value pair
+	type attribute = struct
+		name	: byte[:]
+		value	: byte[:]
+	;;
+
+	// A tuple composed of attributes
+	type tuple = struct
+		attributes : attribute[:]
+	;;
+
+	// An individual record composed of tuples
+	type record = struct
+		tuples : tuple[:]
+	;;
+
+	// A parsed attrdb database
+	type db = struct
+		records	: record[:]
+	;;
+
+	// The results from a query
+	type query = union
+		`Some
+		`None
+	;;
+;;
+
+
+// Open and parse a db file
+const open = {path : byte[:]
+	match bio.open(path, bio.Rd)
+	| `std.Ok	f:
+		-> `std.Ok f
+
+	| `std.Err	e:
+		-> `std.Err e
+	;;
+}
+
+// Parse a file
+const parse = {f : bio.file#
+	var db
+
+	var inrecord = false
+
+	for c : bio.bychar(f)
+		;
+
+	;;
+
+	-> `std.Ok db
+}

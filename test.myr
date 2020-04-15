@@ -1,14 +1,12 @@
 use std
-use ndb
+use adb
 
 const main = {
-	match ndb.open("./test.ndb")
+	match adb.open("./test.adb")
 	| `std.Ok	f:
 		std.put("opened.\n")
 
-		ndb.tabwidth = 4
-
-		match ndb.parse(f)
+		match adb.parse(f)
 		| `std.Ok	db:
 			std.put("parsed.\n")
 

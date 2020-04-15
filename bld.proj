@@ -1,13 +1,13 @@
-## Process and query ndb(6) files
+## Process and query attrdb(6) files
 
 # Library
-lib ndb =
-	ndb.myr
+lib adb =
+	adb.myr
 ;;
 
 # Tests
 test tests =
 	test.myr
-	lib ndb
+	lib adb
 ;;
 
