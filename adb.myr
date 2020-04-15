@@ -62,8 +62,8 @@ const ingest = {path : byte[:]
 
 	// States for parsing state machine
 	type states = union
-	`SingleQuote
-	`DoubleQuote
+	`SingleQuote	uint64		// The starting character point for the quote
+	`DoubleQuote	uint64		// ^
 	`Comment
 	`Newline
 	`Key
@@ -83,7 +83,13 @@ const ingest = {path : byte[:]
 	var cn		= 0
 
 	// String builder buffer
-	var buf		= std.mksb()	// Memory leak?
+	var buf		= std.mksb()	// Memory leak? - need init for compiler to ☺
+
+	// Other builders
+	var pair	: attribute
+	var tuple	: tuple
+	var record	: record
+
 
 	// Parse into db
 	for c : bio.bychar(f)
@@ -96,10 +102,23 @@ const ingest = {path : byte[:]
 			cn = 0
 		;;
 
-		std.put("→ {}				({})\n", c, state)
+		// Nice printing
+		std.put("→ ")
+		match c
+		| '\n':
+			std.put("\\n")
+		| '\t':
+			std.put("\\t")
+		| ' ':
+			std.put("_")
+		| _:
+			std.put("{}", c)
+		;;
+		std.put("				({})\n", state)
 
 		match state
 		| `Comment:
+			// Read through until end of line
 			if c == '\n'
 				state = `Newline
 			;;
@@ -126,47 +145,154 @@ const ingest = {path : byte[:]
 		| '\n':
 			// TODO - commit last value, if any to pair
 			var str = std.sbfin(buf)
-			std.put("» finished value: {}\n", str)
+
+			if str.len < 1
+				// Empty string, discard value
+				;
+			else
+				std.put("» finished value (\\n): {}\n", str)
+			;;
 
 			state = `Newline
+
 		| '\'':
-			state = `SingleQuote
+			match state
+			| `SingleQuote origin:
+				// In a quote already
+
+				match bio.peekc(f)
+				| `std.Ok	next:
+					match next
+					| '\'':
+						// A '' in a quote
+						std.sbputc(buf, '\'')
+
+						// Consume the next quote
+						bio.getc(f)
+					| _:
+						// Ending a quote
+						// TODO - commit value to pair
+						var str = std.sbfin(buf)
+
+						if str.len < 1
+							// Empty string, discard value
+						else
+							std.put("» finished value ('): {}\n", str)
+						;;
+
+						state = `Key
+						buf = std.mksb()
+					;;
+				| `std.Err	e:
+					-> `std.Err std.fmt("single quote peek failed at {}:{}:{}", path, line, cn)
+				;;
+
+			| `Value:
+				// Beginning a quote
+				state = `SingleQuote cn
+			| _:
+				-> `std.Err std.fmt("unexpected single quote at {}:{}:{}", path, line, cn)
+			;;
+
 		| '\"':
-			state = `DoubleQuote
+			match state
+			| `DoubleQuote origin:
+				// In a quote already
+
+				match bio.peekc(f)
+				| `std.Ok	next:
+					match next
+					| '\"':
+						// A "" in a quote
+						std.sbputc(buf, '\"')
+
+						// Consume the next quote
+						bio.getc(f)
+					| _:
+						// Ending a quote
+						// TODO - commit value to pair
+						var str = std.sbfin(buf)
+
+						if str.len < 1
+							// Empty string, discard value
+						else
+							std.put("» finished value (\"): {}\n", str)
+						;;
+
+						state = `Key
+						buf = std.mksb()
+					;;
+				| `std.Err	e:
+					-> `std.Err std.fmt("double quote peek failed at {}:{}:{}", path, line, cn)
+				;;
+
+			| `Value:
+				// Beginning a quote
+				state = `DoubleQuote cn
+
+			| _:
+				-> `std.Err std.fmt("unexpected double quote at {}:{}:{}", path, line, cn)
+			;;
+
 		| ' ':
 
-			match last
+			match state
 			| `Newline:
+				/* might be unnecessary
 				state = `Key
 				buf = std.mksb()
+				*/
+				;
+
+			| `Key:
+				// Allow to passthrough, might be a mistake?
+				;
 
 			| `Value:
 				// TODO - commit value to pair
 				var str = std.sbfin(buf)
-				std.put("» finished value: {}\n", str)
+
+				if str.len < 1
+					// Empty string, discard value
+				else
+					std.put("» finished value (_): {}\n", str)
+				;;
 
 				state = `Key
 				buf = std.mksb()
-				;
+
+			| `SingleQuote origin:
+				std.sbputc(buf, c)
+
+			| `DoubleQuote origin:
+				std.sbputc(buf, c)
+
 			| _:
 				-> `std.Err std.fmt("invalid space at {}:{}:{}", path, line, cn)
 			;;
 
 		| '\t':
-			state = `Key
 			buf = std.mksb()
 
-			match last
+			match state
 			| `Newline:
 				;
 			| _:
 				-> `std.Err std.fmt("invalid tab at {}:{}:{}", path, line, cn)
 			;;
 
+			state = `Key
+
 		| '=':
 			// TODO - commit key to pair
 			var str = std.sbfin(buf)
-			std.put("» finished key: {}\n", str)
+
+			if str.len < 1
+				// Empty string, disallowed for keys
+				-> `std.Err std.fmt("empty key at {}:{}:{}", path, line, cn)
+			else
+				std.put("» finished key (=): {}\n", str)
+			;;
 
 			state = `Value
 			buf = std.mksb()
@@ -179,8 +305,14 @@ const ingest = {path : byte[:]
 			| `Value:
 				std.sbputc(buf, c)
 
+			| `SingleQuote	origin:
+				std.sbputc(buf, c)
+
+			| `DoubleQuote	origin:
+				std.sbputc(buf, c)
+
 			| _:
-				match last
+				match state
 				| `Newline:
 					state = `Key
 					buf = std.mksb()

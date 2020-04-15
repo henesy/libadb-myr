@@ -1,6 +1,6 @@
 # A record with 4 tuples and 5 pairs
 type=person
-	name='Ана'
+	name='Ана'' S'
 	age=10
     food='P is for potato' type="starch"
 
