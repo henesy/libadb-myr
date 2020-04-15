@@ -19,7 +19,7 @@ pkg adb =
 
 	// A tuple composed of attributes
 	type tuple = struct
-		attributes : attribute[:]
+		pairs : attribute[:]
 	;;
 
 	// An individual record composed of tuples
@@ -39,6 +39,14 @@ pkg adb =
 	;;
 ;;
 
+/* ???
+
+	Are traits in myr powerful enough to implement find(@f) as :: findable on top of:
+
+		{tuple[:], record[:], attribute[:]}
+
+	???
+*/
 
 // Open and parse a db file
 const open = {path : byte[:]
@@ -55,9 +63,23 @@ const open = {path : byte[:]
 const parse = {f : bio.file#
 	var db
 
-	var inrecord = false
+	// States for parsing state machine
+	type states = union
+	`Record
+	`SingQuot
+	`DblQuot
+	;;
 
+	// Current line for errors - tick by passing \n
+	var line	= 1
+
+	// Current character for errors - tick each iteration
+	var cn		= 0
+
+	// Parse into db
 	for c : bio.bychar(f)
+		c++
+
 		;
 
 	;;
