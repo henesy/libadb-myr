@@ -12,7 +12,7 @@ pkg adb =
 
 	// An attribute=value pair
 	type attribute = struct
-		name	: byte[:]
+		key		: byte[:]
 		value	: byte[:]
 	;;
 
@@ -107,7 +107,7 @@ const ingest = {path : byte[:]
 		;;
 
 		if chatty
-			// Nice printing
+			// Nice printing of each character
 			std.put("→ ")
 			match c
 			| '\n':
@@ -149,7 +149,6 @@ const ingest = {path : byte[:]
 			state = `Comment
 
 		| '\n':
-			// TODO - commit last value, if any to pair
 			var str = std.sbpeek(buf)
 			std.sbtrim(buf, 0)
 
@@ -158,6 +157,7 @@ const ingest = {path : byte[:]
 				;
 			else
 				std.put("» finished value (\\n): {}\n", str)
+				pair.value = str
 			;;
 
 			state = `Newline
@@ -180,7 +180,6 @@ const ingest = {path : byte[:]
 						bio.getc(f)
 					| _:
 						// Ending a quote
-						// TODO - commit value to pair
 						var str = std.sbpeek(buf)
 						std.sbtrim(buf, 0)
 
@@ -188,6 +187,7 @@ const ingest = {path : byte[:]
 							// Empty string, discard value
 						else
 							std.put("» finished value ('): {}\n", str)
+							pair.value = str
 						;;
 
 						state = `Key
@@ -226,7 +226,6 @@ const ingest = {path : byte[:]
 						bio.getc(f)
 					| _:
 						// Ending a quote
-						// TODO - commit value to pair
 						var str = std.sbpeek(buf)
 						std.sbtrim(buf, 0)
 
@@ -234,6 +233,7 @@ const ingest = {path : byte[:]
 							// Empty string, discard value
 						else
 							std.put("» finished value (\"): {}\n", str)
+							pair.value = str
 						;;
 
 						state = `Key
@@ -259,6 +259,8 @@ const ingest = {path : byte[:]
 			match state
 			| `Newline:
 				// This is necessary, apparently
+				// Start a new sub-tuple of a record
+				std.put("»» start sub-tuple (_)\n")
 				state = `Key
 				buf = std.mksb()
 
@@ -267,7 +269,6 @@ const ingest = {path : byte[:]
 				;
 
 			| `Value:
-				// TODO - commit value to pair
 				var str = std.sbpeek(buf)
 				std.sbtrim(buf, 0)
 
@@ -275,6 +276,7 @@ const ingest = {path : byte[:]
 					// Empty string, discard value
 				else
 					std.put("» finished value (_): {}\n", str)
+					pair.value = str
 				;;
 
 				state = `Key
@@ -294,15 +296,16 @@ const ingest = {path : byte[:]
 			match state
 			| `Newline:
 				// This is necessary, apparently
+				// Start a new sub-tuple of a record
 				state = `Key
 				buf = std.mksb()
+				std.put("»» start sub-tuple (\\t)\n")
 
 			| `Key:
 				// Allow to passthrough, might be a mistake?
 				;
 
 			| `Value:
-				// TODO - commit value to pair
 				var str = std.sbpeek(buf)
 				std.sbtrim(buf, 0)
 
@@ -310,6 +313,7 @@ const ingest = {path : byte[:]
 					// Empty string, discard value
 				else
 					std.put("» finished value (\\t): {}\n", str)
+					pair.value = str
 				;;
 
 				state = `Key
@@ -326,7 +330,6 @@ const ingest = {path : byte[:]
 			;;
 
 		| '=':
-			// TODO - commit key to pair
 			var str = std.sbpeek(buf)
 			std.sbtrim(buf, 0)
 
@@ -335,6 +338,7 @@ const ingest = {path : byte[:]
 				-> `std.Err std.fmt("empty key at {}:{}:{}", path, line, cn)
 			else
 				std.put("» finished key (=): {}\n", str)
+				pair.key = str
 			;;
 
 			state = `Value
@@ -357,17 +361,22 @@ const ingest = {path : byte[:]
 				std.sbputc(buf, c)
 
 			| `Newline:
-					state = `Key
-					std.sbfree(buf)
-					buf = std.mksb()
-					std.sbputc(buf, c)
+				// Start a new record
+				std.put("»» start record\n")
+				std.put("»» start master tuple\n")
+				state = `Key
+				std.sbfree(buf)
+				buf = std.mksb()
+				std.sbputc(buf, c)
 
 			| _:
-				std.put("» unmatched state character\n")
-				-> `std.Err std.fmt("invalid character at {}:{}:{}", path, line, cn)
+				-> `std.Err std.fmt("unexpected character at {}:{}:{}", path, line, cn)
 			;;
 		;;
 	;;
+
+	// TODO - if there is a tuple (or key= only pair) dangling, be sure to append it
+	// Check key.len?
 
 	-> `std.Ok db
 }
