@@ -36,6 +36,10 @@ pkg adb =
 		`Some
 		`None
 	;;
+
+	/* State */
+
+	var chatty = false
 ;;
 
 /* ???
@@ -102,19 +106,21 @@ const ingest = {path : byte[:]
 			cn = 0
 		;;
 
-		// Nice printing
-		std.put("→ ")
-		match c
-		| '\n':
-			std.put("\\n")
-		| '\t':
-			std.put("\\t")
-		| ' ':
-			std.put("_")
-		| _:
-			std.put("{}", c)
+		if chatty
+			// Nice printing
+			std.put("→ ")
+			match c
+			| '\n':
+				std.put("\\n")
+			| '\t':
+				std.put("\\t")
+			| ' ':
+				std.put("_")
+			| _:
+				std.put("{}", c)
+			;;
+			std.put("				({})\n", state)
 		;;
-		std.put("				({})\n", state)
 
 		match state
 		| `Comment:
@@ -194,6 +200,10 @@ const ingest = {path : byte[:]
 			| `Value:
 				// Beginning a quote
 				state = `SingleQuote cn
+
+			| `DoubleQuote origin:
+				std.sbputc(buf, c)
+
 			| _:
 				-> `std.Err std.fmt("unexpected single quote at {}:{}:{}", path, line, cn)
 			;;
@@ -236,6 +246,9 @@ const ingest = {path : byte[:]
 			| `Value:
 				// Beginning a quote
 				state = `DoubleQuote cn
+
+			| `SingleQuote origin:
+				std.sbputc(buf, c)
 
 			| _:
 				-> `std.Err std.fmt("unexpected double quote at {}:{}:{}", path, line, cn)
@@ -355,8 +368,6 @@ const ingest = {path : byte[:]
 			;;
 		;;
 	;;
-
-	std.put("{} lines and {} runes\n", line-1, cn)
 
 	-> `std.Ok db
 }
