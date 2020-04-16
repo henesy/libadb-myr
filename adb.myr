@@ -131,7 +131,7 @@ const ingest = {path : byte[:]
 		match c
 		| '#':
 			// Allow comments at the beginning of lines and after values
-			match last
+			match state
 			| `Newline:
 				;
 			| `Value:
@@ -238,11 +238,9 @@ const ingest = {path : byte[:]
 
 			match state
 			| `Newline:
-				/* might be unnecessary
+				// This is necessary, apparently
 				state = `Key
 				buf = std.mksb()
-				*/
-				;
 
 			| `Key:
 				// Allow to passthrough, might be a mistake?
@@ -272,16 +270,38 @@ const ingest = {path : byte[:]
 			;;
 
 		| '\t':
-			buf = std.mksb()
-
 			match state
 			| `Newline:
+				// This is necessary, apparently
+				state = `Key
+				buf = std.mksb()
+
+			| `Key:
+				// Allow to passthrough, might be a mistake?
 				;
+
+			| `Value:
+				// TODO - commit value to pair
+				var str = std.sbfin(buf)
+
+				if str.len < 1
+					// Empty string, discard value
+				else
+					std.put("» finished value (\\t): {}\n", str)
+				;;
+
+				state = `Key
+				buf = std.mksb()
+
+			| `SingleQuote origin:
+				std.sbputc(buf, c)
+
+			| `DoubleQuote origin:
+				std.sbputc(buf, c)
+
 			| _:
 				-> `std.Err std.fmt("invalid tab at {}:{}:{}", path, line, cn)
 			;;
-
-			state = `Key
 
 		| '=':
 			// TODO - commit key to pair
@@ -300,6 +320,7 @@ const ingest = {path : byte[:]
 			// A key or value text segment
 			match state
 			| `Key:
+				std.put("» pushed into key\n")
 				std.sbputc(buf, c)
 
 			| `Value:
@@ -311,16 +332,15 @@ const ingest = {path : byte[:]
 			| `DoubleQuote	origin:
 				std.sbputc(buf, c)
 
-			| _:
-				match state
-				| `Newline:
+			| `Newline:
 					state = `Key
+					std.sbfree(buf)
 					buf = std.mksb()
 					std.sbputc(buf, c)
 
-				| _:
-					-> `std.Err std.fmt("invalid character at {}:{}:{}", path, line, cn)
-				;;
+			| _:
+				std.put("» unmatched state character\n")
+				-> `std.Err std.fmt("invalid character at {}:{}:{}", path, line, cn)
 			;;
 		;;
 	;;
