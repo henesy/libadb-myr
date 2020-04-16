@@ -144,7 +144,8 @@ const ingest = {path : byte[:]
 
 		| '\n':
 			// TODO - commit last value, if any to pair
-			var str = std.sbfin(buf)
+			var str = std.sbpeek(buf)
+			std.sbtrim(buf, 0)
 
 			if str.len < 1
 				// Empty string, discard value
@@ -165,14 +166,17 @@ const ingest = {path : byte[:]
 					match next
 					| '\'':
 						// A '' in a quote
-						std.sbputc(buf, '\'')
+						if ! std.sbputc(buf, '\'')
+							-> `std.Err std.fmt("could not insert ' at {}:{}:{}", path, line, cn)
+						;;
 
 						// Consume the next quote
 						bio.getc(f)
 					| _:
 						// Ending a quote
 						// TODO - commit value to pair
-						var str = std.sbfin(buf)
+						var str = std.sbpeek(buf)
+						std.sbtrim(buf, 0)
 
 						if str.len < 1
 							// Empty string, discard value
@@ -204,14 +208,17 @@ const ingest = {path : byte[:]
 					match next
 					| '\"':
 						// A "" in a quote
-						std.sbputc(buf, '\"')
+						if ! std.sbputc(buf, '\"')
+							-> `std.Err std.fmt("could not insert \" at {}:{}:{}", path, line, cn)
+						;;
 
 						// Consume the next quote
 						bio.getc(f)
 					| _:
 						// Ending a quote
 						// TODO - commit value to pair
-						var str = std.sbfin(buf)
+						var str = std.sbpeek(buf)
+						std.sbtrim(buf, 0)
 
 						if str.len < 1
 							// Empty string, discard value
@@ -248,7 +255,8 @@ const ingest = {path : byte[:]
 
 			| `Value:
 				// TODO - commit value to pair
-				var str = std.sbfin(buf)
+				var str = std.sbpeek(buf)
+				std.sbtrim(buf, 0)
 
 				if str.len < 1
 					// Empty string, discard value
@@ -282,7 +290,8 @@ const ingest = {path : byte[:]
 
 			| `Value:
 				// TODO - commit value to pair
-				var str = std.sbfin(buf)
+				var str = std.sbpeek(buf)
+				std.sbtrim(buf, 0)
 
 				if str.len < 1
 					// Empty string, discard value
@@ -305,7 +314,8 @@ const ingest = {path : byte[:]
 
 		| '=':
 			// TODO - commit key to pair
-			var str = std.sbfin(buf)
+			var str = std.sbpeek(buf)
+			std.sbtrim(buf, 0)
 
 			if str.len < 1
 				// Empty string, disallowed for keys
@@ -320,8 +330,9 @@ const ingest = {path : byte[:]
 			// A key or value text segment
 			match state
 			| `Key:
-				std.put("» pushed into key\n")
-				std.sbputc(buf, c)
+				if ! std.sbputc(buf, c)
+					-> `std.Err std.fmt("could not insert key char at {}:{}:{}", path, line, cn)
+				;;
 
 			| `Value:
 				std.sbputc(buf, c)
