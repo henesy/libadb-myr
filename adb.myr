@@ -12,8 +12,8 @@ pkg adb =
 
 	// An attribute=value pair
 	type attribute = struct
-		key		: byte[256]
-		value	: byte[256]
+		key		: byte[:]
+		value	: byte[:]
 	;;
 
 	// A tuple composed of attributes
@@ -337,8 +337,13 @@ const ingest = {path : byte[:]
 
 				std.put("»» committing previous tuple (\\t)\n")
 
+				/*
 				record.tuples = std.slpush(&record.tuples, tuple)
 				tuple.pairs = std.slzalloc(0)
+				*/
+
+				ti++
+				pi = 0
 
 				std.put("»» start sub-tuple (\\t)\n")
 
@@ -354,12 +359,14 @@ const ingest = {path : byte[:]
 					// Empty string, discard value
 				else
 					std.put("» finished value (\\t): {}\n", str)
-					pair.value = str
+					db.records[ri].tuples[ti].pairs[pi].value = str
 				;;
 
 				std.put("»» committing previous pair (\\t)\n")
 
-				tuple.pairs = std.slpush(&tuple.pairs, pair)
+				//tuple.pairs = std.slpush(&tuple.pairs, pair)
+
+				pi++
 
 				state = `Key
 				buf = std.mksb()
@@ -383,7 +390,7 @@ const ingest = {path : byte[:]
 				-> `std.Err std.fmt("empty key at {}:{}:{}", path, line, cn)
 			else
 				std.put("» finished key (=): {}\n", str)
-				pair.key = str
+				db.records[ri].tuples[ti].pairs[pi].key = str
 			;;
 
 			state = `Value
@@ -408,15 +415,22 @@ const ingest = {path : byte[:]
 			| `Newline:
 				// Start a new record
 				// TODO - do we need to push the last pair and tuple as well?
-				if record.tuples.len > 0
+				if ti > 0
 					std.put("»» committing previous record\n")
-					db.records = std.slpush(&db.records, record)
+					//db.records = std.slpush(&db.records, record)
 
-					std.put("»» # tuples in rec = {}\n", record.tuples.len)
+					std.put("»» # tuples in rec = {}\n", ti)
+
+					ri++
+					ti = 0
+					pi = 0
+
 				;;
 
-				record.tuples = std.slzalloc(0)
-				tuple.pairs = std.slzalloc(0)
+				//record.tuples = std.slzalloc(0)
+				//tuple.pairs = std.slzalloc(0)
+				ti = 0
+				pi = 0
 
 				std.put("»» start record\n")
 				std.put("»» start master tuple\n")
@@ -437,10 +451,11 @@ const ingest = {path : byte[:]
 
 	// TODO - if there is a tuple (or key= only pair) dangling, be sure to append it
 	// Check key.len?
-	if record.tuples.len > 0
+	if ti > 0
 		// TODO - do we need to push the last pair and tuple as well?
 		std.put("»» committing dangling record\n")
-		db.records = std.slpush(&db.records, record)
+		//db.records = std.slpush(&db.records, record)
+		ri++
 	;;
 
 
