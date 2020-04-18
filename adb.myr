@@ -164,7 +164,7 @@ const ingest = {path : byte[:]
 				;
 			else
 				std.put("» finished value (\\n): {}\n", str)
-				pair.value = str
+				db.records[ri].tuples[ti].pairs[pi].value = str
 			;;
 
 			state = `Newline
@@ -194,12 +194,15 @@ const ingest = {path : byte[:]
 							// Empty string, discard value
 						else
 							std.put("» finished value ('): {}\n", str)
-							pair.value = str
+
+							db.records[ri].tuples[ti].pairs[pi].value = str
 						;;
 
 						std.put("»» committing previous pair (')\n")
 
-						tuple.pairs = std.slpush(&tuple.pairs, pair)
+						//tuple.pairs = std.slpush(&tuple.pairs, pair)
+
+						pi++
 
 						state = `Key
 						buf = std.mksb()
@@ -244,12 +247,14 @@ const ingest = {path : byte[:]
 							// Empty string, discard value
 						else
 							std.put("» finished value (\"): {}\n", str)
-							pair.value = str
+							db.records[ri].tuples[ti].pairs[pi].value = str
 						;;
 
 						std.put("»» committing previous pair (\")\n")
 
-						tuple.pairs = std.slpush(&tuple.pairs, pair)
+						//tuple.pairs = std.slpush(&tuple.pairs, pair)
+
+						pi++
 
 						state = `Key
 						buf = std.mksb()
@@ -277,8 +282,13 @@ const ingest = {path : byte[:]
 				// Start a new sub-tuple of a record
 				std.put("»» committing previous tuple to record (_)\n")
 
+				/*
 				record.tuples = std.slpush(&record.tuples, tuple)
 				tuple.pairs = std.slzalloc(0)
+				*/
+
+				ti++
+				pi = 0
 
 				std.put("»» start sub-tuple (_)\n")
 				state = `Key
@@ -296,12 +306,13 @@ const ingest = {path : byte[:]
 					// Empty string, discard value
 				else
 					std.put("» finished value (_): {}\n", str)
-					pair.value = str
+					db.records[ri].tuples[ti].pairs[pi].value = str
 				;;
 
 				std.put("»» committing previous pair (_)\n")
 
-				tuple.pairs = std.slpush(&tuple.pairs, pair)
+				//tuple.pairs = std.slpush(&tuple.pairs, pair)
+				pi++
 
 				state = `Key
 				buf = std.mksb()
