@@ -19,19 +19,16 @@ pkg adb =
 	// A tuple composed of attributes
 	type tuple = struct
 		pairs	: attribute[16]
-		n		: uint
 	;;
 
 	// An individual record composed of tuples
 	type record = struct
 		tuples	: tuple[16]
-		n		: uint
 	;;
 
 	// A parsed attrdb database
 	type db = struct
 		records : record[16]
-		n		: uint
 	;;
 
 	// The results from a query
@@ -450,7 +447,6 @@ const ingest = {path : byte[:]
 		//db.records = std.slpush(&db.records, record)
 		ri++
 	;;
-
 
 	var nr = 0, nt = 0, np = 0
 	for r : db.records
