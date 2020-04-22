@@ -18,17 +18,20 @@ pkg adb =
 
 	// A tuple composed of attributes
 	type tuple = struct
-		pairs : attribute[256]
+		pairs	: attribute[16]
+		n		: uint
 	;;
 
 	// An individual record composed of tuples
 	type record = struct
-		tuples : tuple[256]
+		tuples	: tuple[16]
+		n		: uint
 	;;
 
 	// A parsed attrdb database
 	type db = struct
-		records : record[256]
+		records : record[16]
+		n		: uint
 	;;
 
 	// The results from a query
@@ -88,16 +91,6 @@ const ingest = {path : byte[:]
 
 	// String builder buffer
 	var buf		= std.mksb()	// Memory leak? - need init for compiler to ☺
-
-	// Other builders
-	/* - build into the db itself
-	var pair	: attribute
-	var tuple	: tuple
-	var record	: record
-	*/
-
-	// Init db
-	//db.records = std.slfill(&db.records, 0)
 
 	// Index trackers for slices
 	var ki = 0, vi = 0, pi = 0, ti = 0, ri = 0
@@ -462,18 +455,19 @@ const ingest = {path : byte[:]
 	var nr = 0, nt = 0, np = 0
 	for r : db.records
 		nr++
-		std.put("nr = {}\n", nr)
+		//std.put("nr = {}\n", nr)
 		for t : r.tuples
 			nt++
-			std.put("nt = {}\n", nt)
+			//std.put("nt = {}\n", nt)
 			for p : t.pairs
-				std.put("np = {}\n", np)
+				//std.put("np = {}\n", np)
 				np++
 
 				if p.key.len < 1
-					std.put("¡! 0 length key at {}/{}/{}\n", nr, nt, np)
+					//std.put("¡! 0 length key at {}/{}/{}\n", nr, nt, np)
+					;
 				elif p.value.len < 1
-					std.put("¡! 0 length value at {}/{}/{}\n", nr, nt, np)
+					std.put("¡! 0 length value at {}/{}/{} with key \"{}\"\n", nr, nt, np, p.key)
 				else
 					std.put("	{}={}\n", p.key, p.value)
 				;;
