@@ -12,6 +12,7 @@ pkg adb =
 
 	// An attribute=value pair
 	type attribute = struct
+		// TODO - make this a tagged union of `Singleton key || `Pair (key, value) ?
 		key		: byte[:]
 		value	: byte[:]
 	;;
@@ -90,7 +91,7 @@ const ingest = {path : byte[:]
 	var buf		= std.mksb()	// Memory leak? - need init for compiler to ☺
 
 	// Index trackers for slices
-	var ki = 0, vi = 0, pi = 0, ti = 0, ri = 0
+	var pi = 0, ti = 0, ri = 0
 
 	// Parse into db
 	for c : bio.bychar(f)
@@ -190,8 +191,6 @@ const ingest = {path : byte[:]
 
 						std.put("»» committing previous pair (')\n")
 
-						//tuple.pairs = std.slpush(&tuple.pairs, pair)
-
 						pi++
 
 						state = `Key
@@ -228,6 +227,7 @@ const ingest = {path : byte[:]
 
 						// Consume the next quote
 						bio.getc(f)
+
 					| _:
 						// Ending a quote
 						var str = std.sbpeek(buf)
@@ -235,6 +235,7 @@ const ingest = {path : byte[:]
 
 						if str.len < 1
 							// Empty string, discard value
+							;
 						else
 							std.put("» finished value (\"): {}\n", str)
 							db.records[ri].tuples[ti].pairs[pi].value = str
@@ -242,13 +243,12 @@ const ingest = {path : byte[:]
 
 						std.put("»» committing previous pair (\")\n")
 
-						//tuple.pairs = std.slpush(&tuple.pairs, pair)
-
 						pi++
 
 						state = `Key
 						buf = std.mksb()
 					;;
+
 				| `std.Err	e:
 					-> `std.Err std.fmt("double quote peek failed at {}:{}:{}", path, line, cn)
 				;;
@@ -272,11 +272,6 @@ const ingest = {path : byte[:]
 				// Start a new sub-tuple of a record
 				std.put("»» committing previous tuple to record (_)\n")
 
-				/*
-				record.tuples = std.slpush(&record.tuples, tuple)
-				tuple.pairs = std.slzalloc(0)
-				*/
-
 				ti++
 				pi = 0
 
@@ -294,6 +289,7 @@ const ingest = {path : byte[:]
 
 				if str.len < 1
 					// Empty string, discard value
+					;
 				else
 					std.put("» finished value (_): {}\n", str)
 					db.records[ri].tuples[ti].pairs[pi].value = str
@@ -301,7 +297,6 @@ const ingest = {path : byte[:]
 
 				std.put("»» committing previous pair (_)\n")
 
-				//tuple.pairs = std.slpush(&tuple.pairs, pair)
 				pi++
 
 				state = `Key
@@ -327,11 +322,6 @@ const ingest = {path : byte[:]
 
 				std.put("»» committing previous tuple (\\t)\n")
 
-				/*
-				record.tuples = std.slpush(&record.tuples, tuple)
-				tuple.pairs = std.slzalloc(0)
-				*/
-
 				ti++
 				pi = 0
 
@@ -353,8 +343,6 @@ const ingest = {path : byte[:]
 				;;
 
 				std.put("»» committing previous pair (\\t)\n")
-
-				//tuple.pairs = std.slpush(&tuple.pairs, pair)
 
 				pi++
 
@@ -404,10 +392,8 @@ const ingest = {path : byte[:]
 
 			| `Newline:
 				// Start a new record
-				// TODO - do we need to push the last pair and tuple as well?
 				if ti > 0
 					std.put("»» committing previous record\n")
-					//db.records = std.slpush(&db.records, record)
 
 					std.put("»» # tuples in rec = {}\n", ti)
 
@@ -417,8 +403,6 @@ const ingest = {path : byte[:]
 
 				;;
 
-				//record.tuples = std.slzalloc(0)
-				//tuple.pairs = std.slzalloc(0)
 				ti = 0
 				pi = 0
 
@@ -430,8 +414,6 @@ const ingest = {path : byte[:]
 				std.sbfree(buf)
 				buf = std.mksb()
 				std.sbputc(buf, c)
-
-
 
 			| _:
 				-> `std.Err std.fmt("unexpected character at {}:{}:{}", path, line, cn)
@@ -448,6 +430,8 @@ const ingest = {path : byte[:]
 		ri++
 	;;
 
+	// TODO - trim erroneous slice growth? ; check for empty/unused record/tuple/pair growth, then cut them?
+
 	var nr = 0, nt = 0, np = 0
 	for r : db.records
 		nr++
@@ -460,26 +444,16 @@ const ingest = {path : byte[:]
 				np++
 
 				if p.key.len < 1
-					//std.put("¡! 0 length key at {}/{}/{}\n", nr, nt, np)
+					// Skip len(0) keys
 					;
 				elif p.value.len < 1
-					std.put("¡! 0 length value at {}/{}/{} with key \"{}\"\n", nr, nt, np, p.key)
+					std.put("	{}=\n", p.key)
 				else
 					std.put("	{}={}\n", p.key, p.value)
 				;;
 			;;
 		;;
 	;;
-
-	/* Correct:
-
-		nr = 4
-
-		nt = 12
-
-		np = 17
-	*/
-	std.put("# nr = {}\n# nt = {}\n# np = {}\n", nr, nt, np)
 
 	-> `std.Ok db
 }
