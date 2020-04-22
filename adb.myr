@@ -19,17 +19,17 @@ pkg adb =
 
 	// A tuple composed of attributes
 	type tuple = struct
-		pairs	: attribute[16]
+		pairs	: attribute[:]
 	;;
 
 	// An individual record composed of tuples
 	type record = struct
-		tuples	: tuple[16]
+		tuples	: tuple[:]
 	;;
 
 	// A parsed attrdb database
 	type db = struct
-		records : record[16]
+		records : record[:]
 	;;
 
 	// The results from a query
